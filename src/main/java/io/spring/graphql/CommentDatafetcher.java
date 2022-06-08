@@ -1,12 +1,10 @@
 package io.spring.graphql;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsData;
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
-import com.netflix.graphql.dgs.InputArgument;
 import graphql.execution.DataFetcherResult;
 import graphql.relay.DefaultConnectionCursor;
 import graphql.relay.DefaultPageInfo;
+import graphql.schema.DataFetchingEnvironment;
+import graphql.schema.idl.RuntimeWiring;
 import io.spring.application.CommentQueryService;
 import io.spring.application.CursorPageParameter;
 import io.spring.application.CursorPager;
@@ -15,25 +13,40 @@ import io.spring.application.DateTimeCursor;
 import io.spring.application.data.ArticleData;
 import io.spring.application.data.CommentData;
 import io.spring.core.user.User;
-import io.spring.graphql.DgsConstants.ARTICLE;
-import io.spring.graphql.DgsConstants.COMMENTPAYLOAD;
 import io.spring.graphql.types.Article;
 import io.spring.graphql.types.Comment;
 import io.spring.graphql.types.CommentEdge;
 import io.spring.graphql.types.CommentsConnection;
+import jakarta.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import org.joda.time.format.ISODateTimeFormat;
 
-@DgsComponent
+@Singleton
 @AllArgsConstructor
-public class CommentDatafetcher {
+public class CommentDatafetcher implements GraphQLWiring {
   private CommentQueryService commentQueryService;
 
-  @DgsData(parentType = COMMENTPAYLOAD.TYPE_NAME, field = COMMENTPAYLOAD.Comment)
-  public DataFetcherResult<Comment> getComment(DgsDataFetchingEnvironment dfe) {
+  @Override
+  public void wire(RuntimeWiring.Builder wiring) {
+    wiring.type("CommentPayload", type -> type.dataFetcher("comment", env -> getComment(env)));
+    wiring.type(
+        "Article",
+        type ->
+            type.dataFetcher(
+                "comments",
+                env ->
+                    articleComments(
+                        env.getArgument("first"),
+                        env.getArgument("after"),
+                        env.getArgument("last"),
+                        env.getArgument("before"),
+                        env)));
+  }
+
+  public DataFetcherResult<Comment> getComment(DataFetchingEnvironment dfe) {
     CommentData comment = dfe.getLocalContext();
     Comment commentResult = buildCommentResult(comment);
     return DataFetcherResult.<Comment>newResult()
@@ -47,19 +60,14 @@ public class CommentDatafetcher {
         .build();
   }
 
-  @DgsData(parentType = ARTICLE.TYPE_NAME, field = ARTICLE.Comments)
   public DataFetcherResult<CommentsConnection> articleComments(
-      @InputArgument("first") Integer first,
-      @InputArgument("after") String after,
-      @InputArgument("last") Integer last,
-      @InputArgument("before") String before,
-      DgsDataFetchingEnvironment dfe) {
+      Integer first, String after, Integer last, String before, DataFetchingEnvironment dfe) {
 
     if (first == null && last == null) {
       throw new IllegalArgumentException("first 和 last 必须只存在一个");
     }
 
-    User current = SecurityUtil.getCurrentUser().orElse(null);
+    User current = SecurityUtil.getCurrentUser(dfe).orElse(null);
     Article article = dfe.getSource();
     Map<String, ArticleData> map = dfe.getLocalContext();
     ArticleData articleData = map.get(article.getSlug());

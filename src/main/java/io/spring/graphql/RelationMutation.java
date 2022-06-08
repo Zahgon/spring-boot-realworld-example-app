@@ -1,30 +1,37 @@
 package io.spring.graphql;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsData;
-import com.netflix.graphql.dgs.InputArgument;
+import graphql.schema.DataFetchingEnvironment;
+import graphql.schema.idl.RuntimeWiring;
 import io.spring.api.exception.ResourceNotFoundException;
 import io.spring.application.ProfileQueryService;
 import io.spring.application.data.ProfileData;
 import io.spring.core.user.FollowRelation;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
-import io.spring.graphql.DgsConstants.MUTATION;
 import io.spring.graphql.exception.AuthenticationException;
 import io.spring.graphql.types.Profile;
 import io.spring.graphql.types.ProfilePayload;
+import jakarta.inject.Singleton;
 import lombok.AllArgsConstructor;
 
-@DgsComponent
+@Singleton
 @AllArgsConstructor
-public class RelationMutation {
+public class RelationMutation implements GraphQLWiring {
 
   private UserRepository userRepository;
   private ProfileQueryService profileQueryService;
 
-  @DgsData(parentType = MUTATION.TYPE_NAME, field = MUTATION.FollowUser)
-  public ProfilePayload follow(@InputArgument("username") String username) {
-    User user = SecurityUtil.getCurrentUser().orElseThrow(AuthenticationException::new);
+  @Override
+  public void wire(RuntimeWiring.Builder wiring) {
+    wiring.type(
+        "Mutation",
+        type ->
+            type.dataFetcher("followUser", env -> follow(env.getArgument("username"), env))
+                .dataFetcher("unfollowUser", env -> unfollow(env.getArgument("username"), env)));
+  }
+
+  public ProfilePayload follow(String username, DataFetchingEnvironment dfe) {
+    User user = SecurityUtil.getCurrentUser(dfe).orElseThrow(AuthenticationException::new);
     return userRepository
         .findByUsername(username)
         .map(
@@ -37,9 +44,8 @@ public class RelationMutation {
         .orElseThrow(ResourceNotFoundException::new);
   }
 
-  @DgsData(parentType = MUTATION.TYPE_NAME, field = MUTATION.UnfollowUser)
-  public ProfilePayload unfollow(@InputArgument("username") String username) {
-    User user = SecurityUtil.getCurrentUser().orElseThrow(AuthenticationException::new);
+  public ProfilePayload unfollow(String username, DataFetchingEnvironment dfe) {
+    User user = SecurityUtil.getCurrentUser(dfe).orElseThrow(AuthenticationException::new);
     User target =
         userRepository.findByUsername(username).orElseThrow(ResourceNotFoundException::new);
     return userRepository
@@ -53,7 +59,7 @@ public class RelationMutation {
         .orElseThrow(ResourceNotFoundException::new);
   }
 
-  private Profile buildProfile(@InputArgument("username") String username, User current) {
+  private Profile buildProfile(String username, User current) {
     ProfileData profileData = profileQueryService.findByUsername(username, current).get();
     return Profile.newBuilder()
         .username(profileData.getUsername())

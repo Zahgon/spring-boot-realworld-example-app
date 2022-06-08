@@ -3,17 +3,14 @@ package io.spring.infrastructure.favorite;
 import io.spring.core.favorite.ArticleFavorite;
 import io.spring.core.favorite.ArticleFavoriteRepository;
 import io.spring.infrastructure.DbTestBase;
-import io.spring.infrastructure.repository.MyBatisArticleFavoriteRepository;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
-@Import({MyBatisArticleFavoriteRepository.class})
 public class MyBatisArticleFavoriteRepositoryTest extends DbTestBase {
-  @Autowired private ArticleFavoriteRepository articleFavoriteRepository;
+  @Inject private ArticleFavoriteRepository articleFavoriteRepository;
 
-  @Autowired
+  @Inject
   private io.spring.infrastructure.mybatis.mapper.ArticleFavoriteMapper articleFavoriteMapper;
 
   @Test

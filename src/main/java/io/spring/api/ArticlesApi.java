@@ -1,5 +1,18 @@
 package io.spring.api;
 
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
+import io.spring.api.security.CurrentUser;
+import io.spring.api.web.QueryParameters;
+import io.spring.api.web.RequestBodyReader;
 import io.spring.application.ArticleQueryService;
 import io.spring.application.Page;
 import io.spring.application.article.ArticleCommandService;
@@ -7,29 +20,24 @@ import io.spring.application.article.NewArticleParam;
 import io.spring.core.article.Article;
 import io.spring.core.user.User;
 import java.util.HashMap;
-import javax.validation.Valid;
 import lombok.AllArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 
-@RestController
-@RequestMapping(path = "/articles")
+@Controller("/articles")
+@Consumes(MediaType.ALL)
+@Produces(MediaType.ALL)
 @AllArgsConstructor
 public class ArticlesApi {
   private ArticleCommandService articleCommandService;
   private ArticleQueryService articleQueryService;
+  private RequestBodyReader requestBodyReader;
 
-  @PostMapping
-  public ResponseEntity createArticle(
-      @Valid @RequestBody NewArticleParam newArticleParam, @AuthenticationPrincipal User user) {
+  @Post
+  public HttpResponse<?> createArticle(
+      HttpRequest<?> request, @Nullable @Body byte[] body, @Nullable @CurrentUser User user) {
+    NewArticleParam newArticleParam =
+        requestBodyReader.readValid(request, body, NewArticleParam.class);
     Article article = articleCommandService.createArticle(newArticleParam, user);
-    return ResponseEntity.ok(
+    return HttpResponse.ok(
         new HashMap<String, Object>() {
           {
             put("article", articleQueryService.findById(article.getId(), user).get());
@@ -37,23 +45,21 @@ public class ArticlesApi {
         });
   }
 
-  @GetMapping(path = "feed")
-  public ResponseEntity getFeed(
-      @RequestParam(value = "offset", defaultValue = "0") int offset,
-      @RequestParam(value = "limit", defaultValue = "20") int limit,
-      @AuthenticationPrincipal User user) {
-    return ResponseEntity.ok(articleQueryService.findUserFeed(user, new Page(offset, limit)));
+  @Get("/feed")
+  public HttpResponse<?> getFeed(HttpRequest<?> request, @Nullable @CurrentUser User user) {
+    int offset = QueryParameters.integer(request, "offset", 0);
+    int limit = QueryParameters.integer(request, "limit", 20);
+    return HttpResponse.ok(articleQueryService.findUserFeed(user, new Page(offset, limit)));
   }
 
-  @GetMapping
-  public ResponseEntity getArticles(
-      @RequestParam(value = "offset", defaultValue = "0") int offset,
-      @RequestParam(value = "limit", defaultValue = "20") int limit,
-      @RequestParam(value = "tag", required = false) String tag,
-      @RequestParam(value = "favorited", required = false) String favoritedBy,
-      @RequestParam(value = "author", required = false) String author,
-      @AuthenticationPrincipal User user) {
-    return ResponseEntity.ok(
+  @Get
+  public HttpResponse<?> getArticles(HttpRequest<?> request, @Nullable @CurrentUser User user) {
+    int offset = QueryParameters.integer(request, "offset", 0);
+    int limit = QueryParameters.integer(request, "limit", 20);
+    String tag = QueryParameters.text(request, "tag");
+    String favoritedBy = QueryParameters.text(request, "favorited");
+    String author = QueryParameters.text(request, "author");
+    return HttpResponse.ok(
         articleQueryService.findRecentArticles(
             tag, author, favoritedBy, new Page(offset, limit), user));
   }

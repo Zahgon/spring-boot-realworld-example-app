@@ -1,60 +1,50 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
+import static io.restassured.RestAssured.given;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
-import io.spring.JacksonCustomizations;
-import io.spring.api.security.WebSecurityConfig;
-import io.spring.application.UserQueryService;
+import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.test.annotation.MockBean;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.restassured.RestAssured;
 import io.spring.application.data.UserData;
 import io.spring.application.user.UserService;
 import io.spring.core.service.JwtService;
+import io.spring.core.service.PasswordHasher;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
 import io.spring.infrastructure.mybatis.readservice.UserReadService;
+import jakarta.inject.Inject;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(UsersApi.class)
-@Import({
-  WebSecurityConfig.class,
-  UserQueryService.class,
-  BCryptPasswordEncoder.class,
-  JacksonCustomizations.class
-})
+@MicronautTest(environments = "test")
 public class UsersApiTest {
-  @Autowired private MockMvc mvc;
+  @Inject private EmbeddedServer server;
 
-  @MockBean private UserRepository userRepository;
+  @Inject private UserRepository userRepository;
 
-  @MockBean private JwtService jwtService;
+  @Inject private JwtService jwtService;
 
-  @MockBean private UserReadService userReadService;
+  @Inject private UserReadService userReadService;
 
-  @MockBean private UserService userService;
+  @Inject private UserService userService;
 
-  @Autowired private PasswordEncoder passwordEncoder;
+  @Inject private PasswordHasher passwordHasher;
 
   private String defaultAvatar;
 
   @BeforeEach
   public void setUp() throws Exception {
-    RestAssuredMockMvc.mockMvc(mvc);
+    RestAssured.port = server.getPort();
     defaultAvatar = "https://static.productionready.io/images/smiley-cyrus.jpg";
   }
 
@@ -104,7 +94,6 @@ public class UsersApiTest {
         .body(param)
         .when()
         .post("/users")
-        .prettyPeek()
         .then()
         .statusCode(422)
         .body("errors.username[0]", equalTo("can't be empty"));
@@ -122,7 +111,6 @@ public class UsersApiTest {
         .body(param)
         .when()
         .post("/users")
-        .prettyPeek()
         .then()
         .statusCode(422)
         .body("errors.email[0]", equalTo("should be an email"));
@@ -144,7 +132,6 @@ public class UsersApiTest {
         .body(param)
         .when()
         .post("/users")
-        .prettyPeek()
         .then()
         .statusCode(422)
         .body("errors.username[0]", equalTo("duplicated username"));
@@ -195,7 +182,7 @@ public class UsersApiTest {
     String username = "johnjacob2";
     String password = "123";
 
-    User user = new User(email, username, passwordEncoder.encode(password), "", defaultAvatar);
+    User user = new User(email, username, passwordHasher.hash(password), "", defaultAvatar);
     UserData userData = new UserData("123", email, username, "", defaultAvatar);
 
     when(userRepository.findByEmail(eq(email))).thenReturn(Optional.of(user));
@@ -263,9 +250,28 @@ public class UsersApiTest {
         .body(param)
         .when()
         .post("/users/login")
-        .prettyPeek()
         .then()
         .statusCode(422)
         .body("message", equalTo("invalid email or password"));
+  }
+
+  @MockBean(UserRepository.class)
+  UserRepository userRepositoryMock() {
+    return mock(UserRepository.class);
+  }
+
+  @MockBean(JwtService.class)
+  JwtService jwtServiceMock() {
+    return mock(JwtService.class);
+  }
+
+  @MockBean(UserReadService.class)
+  UserReadService userReadServiceMock() {
+    return mock(UserReadService.class);
+  }
+
+  @MockBean(UserService.class)
+  UserService userServiceMock() {
+    return mock(UserService.class);
   }
 }

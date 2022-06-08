@@ -1,12 +1,10 @@
 package io.spring;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import io.micronaut.runtime.Micronaut;
 
-@SpringBootApplication
 public class RealWorldApplication {
 
   public static void main(String[] args) {
-    SpringApplication.run(RealWorldApplication.class, args);
+    Micronaut.build(args).mainClass(RealWorldApplication.class).banner(false).start();
   }
 }

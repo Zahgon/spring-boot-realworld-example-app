@@ -1,15 +1,16 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
+import static io.restassured.RestAssured.given;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
-import io.spring.JacksonCustomizations;
-import io.spring.api.security.WebSecurityConfig;
+import io.micronaut.test.annotation.MockBean;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.restassured.RestAssured;
 import io.spring.application.CommentQueryService;
 import io.spring.application.data.CommentData;
 import io.spring.application.data.ProfileData;
@@ -18,35 +19,28 @@ import io.spring.core.article.ArticleRepository;
 import io.spring.core.comment.Comment;
 import io.spring.core.comment.CommentRepository;
 import io.spring.core.user.User;
+import jakarta.inject.Inject;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(CommentsApi.class)
-@Import({WebSecurityConfig.class, JacksonCustomizations.class})
+@MicronautTest(environments = "test")
 public class CommentsApiTest extends TestWithCurrentUser {
 
-  @MockBean private ArticleRepository articleRepository;
+  @Inject private ArticleRepository articleRepository;
 
-  @MockBean private CommentRepository commentRepository;
-  @MockBean private CommentQueryService commentQueryService;
+  @Inject private CommentRepository commentRepository;
+  @Inject private CommentQueryService commentQueryService;
 
   private Article article;
   private CommentData commentData;
   private Comment comment;
-  @Autowired private MockMvc mvc;
 
   @BeforeEach
   public void setUp() throws Exception {
-    RestAssuredMockMvc.mockMvc(mvc);
     super.setUp();
     article = new Article("title", "desc", "body", Arrays.asList("test", "java"), user.getId());
     when(articleRepository.findBySlug(eq(article.getSlug()))).thenReturn(Optional.of(article));
@@ -120,9 +114,8 @@ public class CommentsApiTest extends TestWithCurrentUser {
   public void should_get_comments_of_article_success() throws Exception {
     when(commentQueryService.findByArticleId(anyString(), eq(null)))
         .thenReturn(Arrays.asList(commentData));
-    RestAssuredMockMvc.when()
+    RestAssured.when()
         .get("/articles/{slug}/comments", article.getSlug())
-        .prettyPeek()
         .then()
         .statusCode(200)
         .body("comments[0].id", equalTo(commentData.getId()));
@@ -161,5 +154,20 @@ public class CommentsApiTest extends TestWithCurrentUser {
         .delete("/articles/{slug}/comments/{id}", article.getSlug(), comment.getId())
         .then()
         .statusCode(403);
+  }
+
+  @MockBean(ArticleRepository.class)
+  ArticleRepository articleRepositoryMock() {
+    return mock(ArticleRepository.class);
+  }
+
+  @MockBean(CommentRepository.class)
+  CommentRepository commentRepositoryMock() {
+    return mock(CommentRepository.class);
+  }
+
+  @MockBean(CommentQueryService.class)
+  CommentQueryService commentQueryServiceMock() {
+    return mock(CommentQueryService.class);
   }
 }

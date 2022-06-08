@@ -4,15 +4,15 @@ import io.spring.core.user.FollowRelation;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
 import io.spring.infrastructure.mybatis.mapper.UserMapper;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.Optional;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Repository;
 
-@Repository
+@Singleton
 public class MyBatisUserRepository implements UserRepository {
   private final UserMapper userMapper;
 
-  @Autowired
+  @Inject
   public MyBatisUserRepository(UserMapper userMapper) {
     this.userMapper = userMapper;
   }

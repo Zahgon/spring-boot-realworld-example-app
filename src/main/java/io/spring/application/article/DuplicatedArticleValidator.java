@@ -2,14 +2,19 @@ package io.spring.application.article;
 
 import io.spring.application.ArticleQueryService;
 import io.spring.core.article.Article;
-import javax.validation.ConstraintValidator;
-import javax.validation.ConstraintValidatorContext;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.inject.Singleton;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
 
+@Singleton
 class DuplicatedArticleValidator
     implements ConstraintValidator<DuplicatedArticleConstraint, String> {
 
-  @Autowired private ArticleQueryService articleQueryService;
+  private final ArticleQueryService articleQueryService;
+
+  DuplicatedArticleValidator(ArticleQueryService articleQueryService) {
+    this.articleQueryService = articleQueryService;
+  }
 
   @Override
   public boolean isValid(String value, ConstraintValidatorContext context) {

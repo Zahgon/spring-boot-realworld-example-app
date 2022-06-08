@@ -1,42 +1,45 @@
 package io.spring.application.user;
 
+import io.micronaut.context.annotation.Value;
+import io.spring.application.ServiceArgumentValidator;
+import io.spring.core.service.PasswordHasher;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import jakarta.validation.Constraint;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
+import jakarta.validation.Valid;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import javax.validation.Constraint;
-import javax.validation.ConstraintValidator;
-import javax.validation.ConstraintValidatorContext;
-import javax.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.validation.annotation.Validated;
 
-@Service
-@Validated
+@Singleton
 public class UserService {
   private UserRepository userRepository;
   private String defaultImage;
-  private PasswordEncoder passwordEncoder;
+  private PasswordHasher passwordHasher;
+  private ServiceArgumentValidator argumentValidator;
 
-  @Autowired
+  @Inject
   public UserService(
       UserRepository userRepository,
       @Value("${image.default}") String defaultImage,
-      PasswordEncoder passwordEncoder) {
+      PasswordHasher passwordHasher,
+      ServiceArgumentValidator argumentValidator) {
     this.userRepository = userRepository;
     this.defaultImage = defaultImage;
-    this.passwordEncoder = passwordEncoder;
+    this.passwordHasher = passwordHasher;
+    this.argumentValidator = argumentValidator;
   }
 
   public User createUser(@Valid RegisterParam registerParam) {
+    argumentValidator.validate(this, "createUser", registerParam);
     User user =
         new User(
             registerParam.getEmail(),
             registerParam.getUsername(),
-            passwordEncoder.encode(registerParam.getPassword()),
+            passwordHasher.hash(registerParam.getPassword()),
             "",
             defaultImage);
     userRepository.save(user);
@@ -44,6 +47,7 @@ public class UserService {
   }
 
   public void updateUser(@Valid UpdateUserCommand command) {
+    argumentValidator.validate(this, "updateUser", command);
     User user = command.getTargetUser();
     UpdateUserParam updateUserParam = command.getParam();
     user.update(
@@ -67,9 +71,14 @@ public class UserService {
   Class[] payload() default {};
 }
 
+@Singleton
 class UpdateUserValidator implements ConstraintValidator<UpdateUserConstraint, UpdateUserCommand> {
 
-  @Autowired private UserRepository userRepository;
+  private final UserRepository userRepository;
+
+  UpdateUserValidator(UserRepository userRepository) {
+    this.userRepository = userRepository;
+  }
 
   @Override
   public boolean isValid(UpdateUserCommand value, ConstraintValidatorContext context) {

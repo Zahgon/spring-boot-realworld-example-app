@@ -1,27 +1,23 @@
 package io.spring.infrastructure.article;
 
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.spring.core.article.Article;
 import io.spring.core.article.ArticleRepository;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
 import io.spring.infrastructure.mybatis.mapper.ArticleMapper;
+import jakarta.inject.Inject;
 import java.util.Arrays;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
-@ActiveProfiles("test")
-@SpringBootTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@MicronautTest(environments = "test", startApplication = false)
 public class ArticleRepositoryTransactionTest {
-  @Autowired private ArticleRepository articleRepository;
+  @Inject private ArticleRepository articleRepository;
 
-  @Autowired private UserRepository userRepository;
+  @Inject private UserRepository userRepository;
 
-  @Autowired private ArticleMapper articleMapper;
+  @Inject private ArticleMapper articleMapper;
 
   @Test
   public void transactional_test() {

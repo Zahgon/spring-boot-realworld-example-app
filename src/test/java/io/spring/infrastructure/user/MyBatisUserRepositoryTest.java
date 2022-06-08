@@ -4,17 +4,14 @@ import io.spring.core.user.FollowRelation;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
 import io.spring.infrastructure.DbTestBase;
-import io.spring.infrastructure.repository.MyBatisUserRepository;
+import jakarta.inject.Inject;
 import java.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 
-@Import(MyBatisUserRepository.class)
 public class MyBatisUserRepositoryTest extends DbTestBase {
-  @Autowired private UserRepository userRepository;
+  @Inject private UserRepository userRepository;
   private User user;
 
   @BeforeEach

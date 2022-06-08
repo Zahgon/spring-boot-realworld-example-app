@@ -3,27 +3,31 @@ package io.spring.infrastructure.repository;
 import io.spring.core.article.Article;
 import io.spring.core.article.ArticleRepository;
 import io.spring.core.article.Tag;
+import io.spring.infrastructure.mybatis.MyBatisTransactions;
 import io.spring.infrastructure.mybatis.mapper.ArticleMapper;
+import jakarta.inject.Singleton;
 import java.util.Optional;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
-@Repository
+@Singleton
 public class MyBatisArticleRepository implements ArticleRepository {
   private ArticleMapper articleMapper;
+  private MyBatisTransactions transactions;
 
-  public MyBatisArticleRepository(ArticleMapper articleMapper) {
+  public MyBatisArticleRepository(ArticleMapper articleMapper, MyBatisTransactions transactions) {
     this.articleMapper = articleMapper;
+    this.transactions = transactions;
   }
 
   @Override
-  @Transactional
   public void save(Article article) {
-    if (articleMapper.findById(article.getId()) == null) {
-      createNew(article);
-    } else {
-      articleMapper.update(article);
-    }
+    transactions.inTransaction(
+        () -> {
+          if (articleMapper.findById(article.getId()) == null) {
+            createNew(article);
+          } else {
+            articleMapper.update(article);
+          }
+        });
   }
 
   private void createNew(Article article) {

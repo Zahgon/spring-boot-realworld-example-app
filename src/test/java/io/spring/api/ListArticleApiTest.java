@@ -1,43 +1,36 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
+import static io.restassured.RestAssured.given;
 import static io.spring.TestHelper.articleDataFixture;
 import static java.util.Arrays.asList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
-import io.spring.JacksonCustomizations;
-import io.spring.api.security.WebSecurityConfig;
+import io.micronaut.test.annotation.MockBean;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.restassured.RestAssured;
 import io.spring.application.ArticleQueryService;
 import io.spring.application.Page;
 import io.spring.application.article.ArticleCommandService;
 import io.spring.application.data.ArticleDataList;
 import io.spring.core.article.ArticleRepository;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(ArticlesApi.class)
-@Import({WebSecurityConfig.class, JacksonCustomizations.class})
+@MicronautTest(environments = "test")
 public class ListArticleApiTest extends TestWithCurrentUser {
-  @MockBean private ArticleRepository articleRepository;
+  @Inject private ArticleRepository articleRepository;
 
-  @MockBean private ArticleQueryService articleQueryService;
+  @Inject private ArticleQueryService articleQueryService;
 
-  @MockBean private ArticleCommandService articleCommandService;
-
-  @Autowired private MockMvc mvc;
+  @Inject private ArticleCommandService articleCommandService;
 
   @Override
   @BeforeEach
   public void setUp() throws Exception {
     super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
   }
 
   @Test
@@ -48,12 +41,12 @@ public class ListArticleApiTest extends TestWithCurrentUser {
     when(articleQueryService.findRecentArticles(
             eq(null), eq(null), eq(null), eq(new Page(0, 20)), eq(null)))
         .thenReturn(articleDataList);
-    RestAssuredMockMvc.when().get("/articles").prettyPeek().then().statusCode(200);
+    RestAssured.when().get("/articles").then().statusCode(200);
   }
 
   @Test
   public void should_get_feeds_401_without_login() throws Exception {
-    RestAssuredMockMvc.when().get("/articles/feed").prettyPeek().then().statusCode(401);
+    RestAssured.when().get("/articles/feed").then().statusCode(401);
   }
 
   @Test
@@ -68,8 +61,22 @@ public class ListArticleApiTest extends TestWithCurrentUser {
         .header("Authorization", "Token " + token)
         .when()
         .get("/articles/feed")
-        .prettyPeek()
         .then()
         .statusCode(200);
+  }
+
+  @MockBean(ArticleRepository.class)
+  ArticleRepository articleRepositoryMock() {
+    return mock(ArticleRepository.class);
+  }
+
+  @MockBean(ArticleQueryService.class)
+  ArticleQueryService articleQueryServiceMock() {
+    return mock(ArticleQueryService.class);
+  }
+
+  @MockBean(ArticleCommandService.class)
+  ArticleCommandService articleCommandServiceMock() {
+    return mock(ArticleCommandService.class);
   }
 }

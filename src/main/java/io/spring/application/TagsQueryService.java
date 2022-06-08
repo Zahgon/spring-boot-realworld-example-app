@@ -1,11 +1,11 @@
 package io.spring.application;
 
 import io.spring.infrastructure.mybatis.readservice.TagReadService;
+import jakarta.inject.Singleton;
 import java.util.List;
 import lombok.AllArgsConstructor;
-import org.springframework.stereotype.Service;
 
-@Service
+@Singleton
 @AllArgsConstructor
 public class TagsQueryService {
   private TagReadService tagReadService;

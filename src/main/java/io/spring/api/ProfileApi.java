@@ -1,6 +1,17 @@
 package io.spring.api;
 
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
 import io.spring.api.exception.ResourceNotFoundException;
+import io.spring.api.security.CurrentUser;
+import io.spring.api.web.PathSegment;
 import io.spring.application.ProfileQueryService;
 import io.spring.application.data.ProfileData;
 import io.spring.core.user.FollowRelation;
@@ -9,34 +20,27 @@ import io.spring.core.user.UserRepository;
 import java.util.HashMap;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
-@RestController
-@RequestMapping(path = "profiles/{username}")
+@Controller("/profiles/{profileUsername:[^/]+}")
+@Consumes(MediaType.ALL)
+@Produces(MediaType.ALL)
 @AllArgsConstructor
 public class ProfileApi {
   private ProfileQueryService profileQueryService;
   private UserRepository userRepository;
 
-  @GetMapping
-  public ResponseEntity getProfile(
-      @PathVariable("username") String username, @AuthenticationPrincipal User user) {
+  @Get
+  public HttpResponse<?> getProfile(
+      @PathSegment("profileUsername") String username, @Nullable @CurrentUser User user) {
     return profileQueryService
         .findByUsername(username, user)
         .map(this::profileResponse)
         .orElseThrow(ResourceNotFoundException::new);
   }
 
-  @PostMapping(path = "follow")
-  public ResponseEntity follow(
-      @PathVariable("username") String username, @AuthenticationPrincipal User user) {
+  @Post("/follow")
+  public HttpResponse<?> follow(
+      @PathSegment("profileUsername") String username, @Nullable @CurrentUser User user) {
     return userRepository
         .findByUsername(username)
         .map(
@@ -48,9 +52,9 @@ public class ProfileApi {
         .orElseThrow(ResourceNotFoundException::new);
   }
 
-  @DeleteMapping(path = "follow")
-  public ResponseEntity unfollow(
-      @PathVariable("username") String username, @AuthenticationPrincipal User user) {
+  @Delete("/follow")
+  public HttpResponse<?> unfollow(
+      @PathSegment("profileUsername") String username, @Nullable @CurrentUser User user) {
     Optional<User> userOptional = userRepository.findByUsername(username);
     if (userOptional.isPresent()) {
       User target = userOptional.get();
@@ -67,8 +71,8 @@ public class ProfileApi {
     }
   }
 
-  private ResponseEntity profileResponse(ProfileData profile) {
-    return ResponseEntity.ok(
+  private HttpResponse<?> profileResponse(ProfileData profile) {
+    return HttpResponse.ok(
         new HashMap<String, Object>() {
           {
             put("profile", profile);

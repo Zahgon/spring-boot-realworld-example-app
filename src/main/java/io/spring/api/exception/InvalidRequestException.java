@@ -1,17 +1,17 @@
 package io.spring.api.exception;
 
-import org.springframework.validation.Errors;
+import java.util.List;
 
 @SuppressWarnings("serial")
 public class InvalidRequestException extends RuntimeException {
-  private final Errors errors;
+  private final List<FieldErrorResource> errors;
 
-  public InvalidRequestException(Errors errors) {
+  public InvalidRequestException(List<FieldErrorResource> errors) {
     super("");
     this.errors = errors;
   }
 
-  public Errors getErrors() {
+  public List<FieldErrorResource> getErrors() {
     return errors;
   }
 }

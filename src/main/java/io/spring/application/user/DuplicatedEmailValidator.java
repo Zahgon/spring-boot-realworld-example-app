@@ -1,14 +1,19 @@
 package io.spring.application.user;
 
 import io.spring.core.user.UserRepository;
-import javax.validation.ConstraintValidator;
-import javax.validation.ConstraintValidatorContext;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.inject.Singleton;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
 
+@Singleton
 public class DuplicatedEmailValidator
     implements ConstraintValidator<DuplicatedEmailConstraint, String> {
 
-  @Autowired private UserRepository userRepository;
+  private final UserRepository userRepository;
+
+  public DuplicatedEmailValidator(UserRepository userRepository) {
+    this.userRepository = userRepository;
+  }
 
   @Override
   public boolean isValid(String value, ConstraintValidatorContext context) {

@@ -1,83 +1,69 @@
 package io.spring.api.security;
 
-import static java.util.Arrays.asList;
+import io.micronaut.http.HttpRequest;
+import java.util.List;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+/**
+ * URL authorization rules of the API. Rules are evaluated in order and the first rule matching the
+ * request method and path decides; requests matching no rule require authentication.
+ */
+public final class WebSecurityConfig {
 
-@Configuration
-@EnableWebSecurity
-public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
-
-  @Bean
-  public JwtTokenFilter jwtTokenFilter() {
-    return new JwtTokenFilter();
+  enum Access {
+    PERMIT_ALL,
+    AUTHENTICATED
   }
 
-  @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
+  static final class Rule {
+    private final String method;
+    private final List<String> patterns;
+    private final Access access;
+
+    Rule(String method, Access access, String... patterns) {
+      this.method = method;
+      this.patterns = List.of(patterns);
+      this.access = access;
+    }
+
+    boolean matches(String requestMethod, String path) {
+      if (method != null && !method.equals(requestMethod)) {
+        return false;
+      }
+      return patterns.stream().anyMatch(pattern -> matchesPattern(pattern, path));
+    }
   }
 
-  @Override
-  protected void configure(HttpSecurity http) throws Exception {
+  static final List<Rule> RULES =
+      List.of(
+          new Rule("OPTIONS", Access.PERMIT_ALL, "/**"),
+          new Rule(null, Access.PERMIT_ALL, "/graphiql"),
+          new Rule(null, Access.PERMIT_ALL, "/graphql"),
+          new Rule("GET", Access.AUTHENTICATED, "/articles/feed"),
+          new Rule("POST", Access.PERMIT_ALL, "/users", "/users/login"),
+          new Rule("GET", Access.PERMIT_ALL, "/articles/**", "/profiles/**", "/tags"));
 
-    http.csrf()
-        .disable()
-        .cors()
-        .and()
-        .exceptionHandling()
-        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-        .and()
-        .sessionManagement()
-        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-        .and()
-        .authorizeRequests()
-        .antMatchers(HttpMethod.OPTIONS)
-        .permitAll()
-        .antMatchers("/graphiql")
-        .permitAll()
-        .antMatchers("/graphql")
-        .permitAll()
-        .antMatchers(HttpMethod.GET, "/articles/feed")
-        .authenticated()
-        .antMatchers(HttpMethod.POST, "/users", "/users/login")
-        .permitAll()
-        .antMatchers(HttpMethod.GET, "/articles/**", "/profiles/**", "/tags")
-        .permitAll()
-        .anyRequest()
-        .authenticated();
+  private WebSecurityConfig() {}
 
-    http.addFilterBefore(jwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
+  static boolean requiresAuthentication(HttpRequest<?> request, String path) {
+    String method = request.getMethodName();
+    for (Rule rule : RULES) {
+      if (rule.matches(method, path)) {
+        return rule.access == Access.AUTHENTICATED;
+      }
+    }
+    return true;
   }
 
-  @Bean
-  public CorsConfigurationSource corsConfigurationSource() {
-    final CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOrigins(asList("*"));
-    configuration.setAllowedMethods(asList("HEAD", "GET", "POST", "PUT", "DELETE", "PATCH"));
-    // setAllowCredentials(true) is important, otherwise:
-    // The value of the 'Access-Control-Allow-Origin' header in the response must not be the
-    // wildcard '*' when the request's credentials mode is 'include'.
-    configuration.setAllowCredentials(false);
-    // setAllowedHeaders is important! Without it, OPTIONS preflight request
-    // will fail with 403 Invalid CORS request
-    configuration.setAllowedHeaders(asList("Authorization", "Cache-Control", "Content-Type"));
-    final UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", configuration);
-    return source;
+  /** Ant-style match supporting exact paths, {@code /**} and a trailing {@code /**}. */
+  static boolean matchesPattern(String pattern, String path) {
+    if ("/**".equals(pattern) || "**".equals(pattern)) {
+      return true;
+    }
+    if (pattern.endsWith("/**")) {
+      String prefix = pattern.substring(0, pattern.length() - 3);
+      return path.startsWith(prefix)
+          && (path.length() == prefix.length() || path.charAt(prefix.length()) == '/');
+    }
+    return pattern.equals(path);
   }
 }

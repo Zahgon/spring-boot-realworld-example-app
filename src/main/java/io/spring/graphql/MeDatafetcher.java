@@ -1,39 +1,41 @@
 package io.spring.graphql;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsData;
 import graphql.execution.DataFetcherResult;
 import graphql.schema.DataFetchingEnvironment;
+import graphql.schema.idl.RuntimeWiring;
 import io.spring.api.exception.ResourceNotFoundException;
 import io.spring.application.UserQueryService;
 import io.spring.application.data.UserData;
 import io.spring.application.data.UserWithToken;
 import io.spring.core.service.JwtService;
-import io.spring.graphql.DgsConstants.QUERY;
-import io.spring.graphql.DgsConstants.USERPAYLOAD;
 import io.spring.graphql.types.User;
+import jakarta.inject.Singleton;
 import lombok.AllArgsConstructor;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.RequestHeader;
 
-@DgsComponent
+@Singleton
 @AllArgsConstructor
-public class MeDatafetcher {
+public class MeDatafetcher implements GraphQLWiring {
   private UserQueryService userQueryService;
   private JwtService jwtService;
 
-  @DgsData(parentType = DgsConstants.QUERY_TYPE, field = QUERY.Me)
+  @Override
+  public void wire(RuntimeWiring.Builder wiring) {
+    wiring.type(
+        "Query",
+        type ->
+            type.dataFetcher(
+                "me",
+                env -> getMe(GraphQLRequestContext.of(env).requiredHeader("Authorization"), env)));
+    wiring.type("UserPayload", type -> type.dataFetcher("user", env -> getUserPayloadUser(env)));
+  }
+
   public DataFetcherResult<User> getMe(
-      @RequestHeader(value = "Authorization") String authorization,
-      DataFetchingEnvironment dataFetchingEnvironment) {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication instanceof AnonymousAuthenticationToken
-        || authentication.getPrincipal() == null) {
+      String authorization, DataFetchingEnvironment dataFetchingEnvironment) {
+    io.spring.core.user.User user =
+        SecurityUtil.getCurrentUser(dataFetchingEnvironment).orElse(null);
+    if (user == null) {
       return null;
     }
-    io.spring.core.user.User user = (io.spring.core.user.User) authentication.getPrincipal();
     UserData userData =
         userQueryService.findById(user.getId()).orElseThrow(ResourceNotFoundException::new);
     UserWithToken userWithToken = new UserWithToken(userData, authorization.split(" ")[1]);
@@ -46,7 +48,6 @@ public class MeDatafetcher {
     return DataFetcherResult.<User>newResult().data(result).localContext(user).build();
   }
 
-  @DgsData(parentType = USERPAYLOAD.TYPE_NAME, field = USERPAYLOAD.User)
   public DataFetcherResult<User> getUserPayloadUser(
       DataFetchingEnvironment dataFetchingEnvironment) {
     io.spring.core.user.User user = dataFetchingEnvironment.getLocalContext();

@@ -4,6 +4,7 @@ import io.spring.application.data.CommentData;
 import io.spring.core.user.User;
 import io.spring.infrastructure.mybatis.readservice.CommentReadService;
 import io.spring.infrastructure.mybatis.readservice.UserRelationshipQueryService;
+import jakarta.inject.Singleton;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -12,9 +13,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import org.joda.time.DateTime;
-import org.springframework.stereotype.Service;
 
-@Service
+@Singleton
 @AllArgsConstructor
 public class CommentQueryService {
   private CommentReadService commentReadService;

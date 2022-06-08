@@ -1,14 +1,10 @@
 package io.spring.graphql;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsData;
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
-import com.netflix.graphql.dgs.DgsQuery;
-import com.netflix.graphql.dgs.InputArgument;
 import graphql.execution.DataFetcherResult;
 import graphql.relay.DefaultConnectionCursor;
 import graphql.relay.DefaultPageInfo;
 import graphql.schema.DataFetchingEnvironment;
+import graphql.schema.idl.RuntimeWiring;
 import io.spring.api.exception.ResourceNotFoundException;
 import io.spring.application.ArticleQueryService;
 import io.spring.application.CursorPageParameter;
@@ -19,38 +15,91 @@ import io.spring.application.data.ArticleData;
 import io.spring.application.data.CommentData;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
-import io.spring.graphql.DgsConstants.ARTICLEPAYLOAD;
-import io.spring.graphql.DgsConstants.COMMENT;
-import io.spring.graphql.DgsConstants.PROFILE;
-import io.spring.graphql.DgsConstants.QUERY;
 import io.spring.graphql.types.Article;
 import io.spring.graphql.types.ArticleEdge;
 import io.spring.graphql.types.ArticlesConnection;
 import io.spring.graphql.types.Profile;
+import jakarta.inject.Singleton;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import org.joda.time.format.ISODateTimeFormat;
 
-@DgsComponent
+@Singleton
 @AllArgsConstructor
-public class ArticleDatafetcher {
+public class ArticleDatafetcher implements GraphQLWiring {
 
   private ArticleQueryService articleQueryService;
   private UserRepository userRepository;
 
-  @DgsQuery(field = QUERY.Feed)
+  @Override
+  public void wire(RuntimeWiring.Builder wiring) {
+    wiring.type(
+        "Query",
+        type ->
+            type.dataFetcher(
+                    "feed",
+                    env ->
+                        getFeed(
+                            env.getArgument("first"),
+                            env.getArgument("after"),
+                            env.getArgument("last"),
+                            env.getArgument("before"),
+                            env))
+                .dataFetcher(
+                    "articles",
+                    env ->
+                        getArticles(
+                            env.getArgument("first"),
+                            env.getArgument("after"),
+                            env.getArgument("last"),
+                            env.getArgument("before"),
+                            env.getArgument("authoredBy"),
+                            env.getArgument("favoritedBy"),
+                            env.getArgument("withTag"),
+                            env))
+                .dataFetcher("article", env -> findArticleBySlug(env.getArgument("slug"), env)));
+    wiring.type(
+        "Profile",
+        type ->
+            type.dataFetcher(
+                    "feed",
+                    env ->
+                        userFeed(
+                            env.getArgument("first"),
+                            env.getArgument("after"),
+                            env.getArgument("last"),
+                            env.getArgument("before"),
+                            env))
+                .dataFetcher(
+                    "favorites",
+                    env ->
+                        userFavorites(
+                            env.getArgument("first"),
+                            env.getArgument("after"),
+                            env.getArgument("last"),
+                            env.getArgument("before"),
+                            env))
+                .dataFetcher(
+                    "articles",
+                    env ->
+                        userArticles(
+                            env.getArgument("first"),
+                            env.getArgument("after"),
+                            env.getArgument("last"),
+                            env.getArgument("before"),
+                            env)));
+    wiring.type("ArticlePayload", type -> type.dataFetcher("article", env -> getArticle(env)));
+    wiring.type("Comment", type -> type.dataFetcher("article", env -> getCommentArticle(env)));
+  }
+
   public DataFetcherResult<ArticlesConnection> getFeed(
-      @InputArgument("first") Integer first,
-      @InputArgument("after") String after,
-      @InputArgument("last") Integer last,
-      @InputArgument("before") String before,
-      DgsDataFetchingEnvironment dfe) {
+      Integer first, String after, Integer last, String before, DataFetchingEnvironment dfe) {
     if (first == null && last == null) {
       throw new IllegalArgumentException("first 和 last 必须只存在一个");
     }
 
-    User current = SecurityUtil.getCurrentUser().orElse(null);
+    User current = SecurityUtil.getCurrentUser(dfe).orElse(null);
 
     CursorPager<ArticleData> articles;
     if (first != null) {
@@ -85,13 +134,8 @@ public class ArticleDatafetcher {
         .build();
   }
 
-  @DgsData(parentType = PROFILE.TYPE_NAME, field = PROFILE.Feed)
   public DataFetcherResult<ArticlesConnection> userFeed(
-      @InputArgument("first") Integer first,
-      @InputArgument("after") String after,
-      @InputArgument("last") Integer last,
-      @InputArgument("before") String before,
-      DgsDataFetchingEnvironment dfe) {
+      Integer first, String after, Integer last, String before, DataFetchingEnvironment dfe) {
     if (first == null && last == null) {
       throw new IllegalArgumentException("first 和 last 必须只存在一个");
     }
@@ -135,18 +179,13 @@ public class ArticleDatafetcher {
         .build();
   }
 
-  @DgsData(parentType = PROFILE.TYPE_NAME, field = PROFILE.Favorites)
   public DataFetcherResult<ArticlesConnection> userFavorites(
-      @InputArgument("first") Integer first,
-      @InputArgument("after") String after,
-      @InputArgument("last") Integer last,
-      @InputArgument("before") String before,
-      DgsDataFetchingEnvironment dfe) {
+      Integer first, String after, Integer last, String before, DataFetchingEnvironment dfe) {
     if (first == null && last == null) {
       throw new IllegalArgumentException("first 和 last 必须只存在一个");
     }
 
-    User current = SecurityUtil.getCurrentUser().orElse(null);
+    User current = SecurityUtil.getCurrentUser(dfe).orElse(null);
     Profile profile = dfe.getSource();
 
     CursorPager<ArticleData> articles;
@@ -189,18 +228,13 @@ public class ArticleDatafetcher {
         .build();
   }
 
-  @DgsData(parentType = PROFILE.TYPE_NAME, field = PROFILE.Articles)
   public DataFetcherResult<ArticlesConnection> userArticles(
-      @InputArgument("first") Integer first,
-      @InputArgument("after") String after,
-      @InputArgument("last") Integer last,
-      @InputArgument("before") String before,
-      DgsDataFetchingEnvironment dfe) {
+      Integer first, String after, Integer last, String before, DataFetchingEnvironment dfe) {
     if (first == null && last == null) {
       throw new IllegalArgumentException("first 和 last 必须只存在一个");
     }
 
-    User current = SecurityUtil.getCurrentUser().orElse(null);
+    User current = SecurityUtil.getCurrentUser(dfe).orElse(null);
     Profile profile = dfe.getSource();
 
     CursorPager<ArticleData> articles;
@@ -242,21 +276,20 @@ public class ArticleDatafetcher {
         .build();
   }
 
-  @DgsData(parentType = DgsConstants.QUERY_TYPE, field = QUERY.Articles)
   public DataFetcherResult<ArticlesConnection> getArticles(
-      @InputArgument("first") Integer first,
-      @InputArgument("after") String after,
-      @InputArgument("last") Integer last,
-      @InputArgument("before") String before,
-      @InputArgument("authoredBy") String authoredBy,
-      @InputArgument("favoritedBy") String favoritedBy,
-      @InputArgument("withTag") String withTag,
-      DgsDataFetchingEnvironment dfe) {
+      Integer first,
+      String after,
+      Integer last,
+      String before,
+      String authoredBy,
+      String favoritedBy,
+      String withTag,
+      DataFetchingEnvironment dfe) {
     if (first == null && last == null) {
       throw new IllegalArgumentException("first 和 last 必须只存在一个");
     }
 
-    User current = SecurityUtil.getCurrentUser().orElse(null);
+    User current = SecurityUtil.getCurrentUser(dfe).orElse(null);
 
     CursorPager<ArticleData> articles;
     if (first != null) {
@@ -297,11 +330,10 @@ public class ArticleDatafetcher {
         .build();
   }
 
-  @DgsData(parentType = ARTICLEPAYLOAD.TYPE_NAME, field = ARTICLEPAYLOAD.Article)
   public DataFetcherResult<Article> getArticle(DataFetchingEnvironment dfe) {
     io.spring.core.article.Article article = dfe.getLocalContext();
 
-    User current = SecurityUtil.getCurrentUser().orElse(null);
+    User current = SecurityUtil.getCurrentUser(dfe).orElse(null);
     ArticleData articleData =
         articleQueryService
             .findById(article.getId(), current)
@@ -318,11 +350,10 @@ public class ArticleDatafetcher {
         .build();
   }
 
-  @DgsData(parentType = COMMENT.TYPE_NAME, field = COMMENT.Article)
   public DataFetcherResult<Article> getCommentArticle(
       DataFetchingEnvironment dataFetchingEnvironment) {
     CommentData comment = dataFetchingEnvironment.getLocalContext();
-    User current = SecurityUtil.getCurrentUser().orElse(null);
+    User current = SecurityUtil.getCurrentUser(dataFetchingEnvironment).orElse(null);
     ArticleData articleData =
         articleQueryService
             .findById(comment.getArticleId(), current)
@@ -339,9 +370,8 @@ public class ArticleDatafetcher {
         .build();
   }
 
-  @DgsQuery(field = QUERY.Article)
-  public DataFetcherResult<Article> findArticleBySlug(@InputArgument("slug") String slug) {
-    User current = SecurityUtil.getCurrentUser().orElse(null);
+  public DataFetcherResult<Article> findArticleBySlug(String slug, DataFetchingEnvironment dfe) {
+    User current = SecurityUtil.getCurrentUser(dfe).orElse(null);
     ArticleData articleData =
         articleQueryService.findBySlug(slug, current).orElseThrow(ResourceNotFoundException::new);
     Article articleResult = buildArticleResult(articleData);

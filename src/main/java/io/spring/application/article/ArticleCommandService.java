@@ -1,21 +1,22 @@
 package io.spring.application.article;
 
+import io.spring.application.ServiceArgumentValidator;
 import io.spring.core.article.Article;
 import io.spring.core.article.ArticleRepository;
 import io.spring.core.user.User;
-import javax.validation.Valid;
+import jakarta.inject.Singleton;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.validation.annotation.Validated;
 
-@Service
-@Validated
+@Singleton
 @AllArgsConstructor
 public class ArticleCommandService {
 
   private ArticleRepository articleRepository;
+  private ServiceArgumentValidator argumentValidator;
 
   public Article createArticle(@Valid NewArticleParam newArticleParam, User creator) {
+    argumentValidator.validate(this, "createArticle", newArticleParam, creator);
     Article article =
         new Article(
             newArticleParam.getTitle(),
@@ -28,6 +29,7 @@ public class ArticleCommandService {
   }
 
   public Article updateArticle(Article article, @Valid UpdateArticleParam updateArticleParam) {
+    argumentValidator.validate(this, "updateArticle", article, updateArticleParam);
     article.update(
         updateArticleParam.getTitle(),
         updateArticleParam.getDescription(),

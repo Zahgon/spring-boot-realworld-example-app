@@ -1,6 +1,16 @@
 package io.spring.api;
 
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
 import io.spring.api.exception.ResourceNotFoundException;
+import io.spring.api.security.CurrentUser;
+import io.spring.api.web.PathSegment;
 import io.spring.application.ArticleQueryService;
 import io.spring.application.data.ArticleData;
 import io.spring.core.article.Article;
@@ -10,25 +20,19 @@ import io.spring.core.favorite.ArticleFavoriteRepository;
 import io.spring.core.user.User;
 import java.util.HashMap;
 import lombok.AllArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
-@RestController
-@RequestMapping(path = "articles/{slug}/favorite")
+@Controller("/articles/{articleSlug:[^/]+}/favorite")
+@Consumes(MediaType.ALL)
+@Produces(MediaType.ALL)
 @AllArgsConstructor
 public class ArticleFavoriteApi {
   private ArticleFavoriteRepository articleFavoriteRepository;
   private ArticleRepository articleRepository;
   private ArticleQueryService articleQueryService;
 
-  @PostMapping
-  public ResponseEntity favoriteArticle(
-      @PathVariable("slug") String slug, @AuthenticationPrincipal User user) {
+  @Post
+  public HttpResponse<?> favoriteArticle(
+      @PathSegment("articleSlug") String slug, @Nullable @CurrentUser User user) {
     Article article =
         articleRepository.findBySlug(slug).orElseThrow(ResourceNotFoundException::new);
     ArticleFavorite articleFavorite = new ArticleFavorite(article.getId(), user.getId());
@@ -36,9 +40,9 @@ public class ArticleFavoriteApi {
     return responseArticleData(articleQueryService.findBySlug(slug, user).get());
   }
 
-  @DeleteMapping
-  public ResponseEntity unfavoriteArticle(
-      @PathVariable("slug") String slug, @AuthenticationPrincipal User user) {
+  @Delete
+  public HttpResponse<?> unfavoriteArticle(
+      @PathSegment("articleSlug") String slug, @Nullable @CurrentUser User user) {
     Article article =
         articleRepository.findBySlug(slug).orElseThrow(ResourceNotFoundException::new);
     articleFavoriteRepository
@@ -50,9 +54,8 @@ public class ArticleFavoriteApi {
     return responseArticleData(articleQueryService.findBySlug(slug, user).get());
   }
 
-  private ResponseEntity<HashMap<String, Object>> responseArticleData(
-      final ArticleData articleData) {
-    return ResponseEntity.ok(
+  private HttpResponse<HashMap<String, Object>> responseArticleData(final ArticleData articleData) {
+    return HttpResponse.ok(
         new HashMap<String, Object>() {
           {
             put("article", articleData);

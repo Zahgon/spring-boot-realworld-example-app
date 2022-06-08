@@ -1,10 +1,10 @@
-# ![RealWorld Example App using Kotlin and Spring](example-logo.png)
+# ![RealWorld Example App using Micronaut](example-logo.png)
 
 [![Actions](https://github.com/gothinkster/spring-boot-realworld-example-app/workflows/Java%20CI/badge.svg)](https://github.com/gothinkster/spring-boot-realworld-example-app/actions)
 
-> ### Spring boot + MyBatis codebase containing real world examples (CRUD, auth, advanced patterns, etc) that adheres to the [RealWorld](https://github.com/gothinkster/realworld-example-apps) spec and API.
+> ### Micronaut + MyBatis codebase containing real world examples (CRUD, auth, advanced patterns, etc) that adheres to the [RealWorld](https://github.com/gothinkster/realworld-example-apps) spec and API.
 
-This codebase was created to demonstrate a fully fledged full-stack application built with Spring boot + Mybatis including CRUD operations, authentication, routing, pagination, and more.
+This codebase was created to demonstrate a fully fledged full-stack application built with Micronaut + MyBatis including CRUD operations, authentication, routing, pagination, and more.
 
 For more information on how to this works with other frontends/backends, head over to the [RealWorld](https://github.com/gothinkster/realworld) repo.
 
@@ -16,10 +16,10 @@ The GraphQL schema is https://github.com/gothinkster/spring-boot-realworld-examp
 
 ![](graphql-schema.png)
 
-And this implementation is using [dgs-framework](https://github.com/Netflix/dgs-framework) which is a quite new java graphql server framework.
+The GraphQL endpoint `/graphql` is served by [graphql-java](https://www.graphql-java.com/) on Micronaut, wired from the same schema file.
 # How it works
 
-The application uses Spring Boot (Web, Mybatis).
+The application uses [Micronaut 4](https://micronaut.io/) (the Netty HTTP server, dependency injection and configuration), plain MyBatis, Flyway and graphql-java.
 
 * Use the idea of Domain Driven Design to separate the business term and infrastructure term.
 * Use MyBatis to implement the [Data Mapper](https://martinfowler.com/eaaCatalog/dataMapper.html) pattern for persistence.
@@ -27,26 +27,32 @@ The application uses Spring Boot (Web, Mybatis).
 
 And the code is organized as this:
 
-1. `api` is the web layer implemented by Spring MVC
+1. `api` is the web layer implemented with Micronaut controllers and filters
 2. `core` is the business model including entities and services
 3. `application` is the high-level services for querying the data transfer objects
-4. `infrastructure`  contains all the implementation classes as the technique details
+4. `infrastructure`  contains all the implementation classes as the technique details (MyBatis sessions and transactions, the Flyway migration run at startup)
+5. `graphql` is the GraphQL layer: the `/graphql` endpoint and its data fetchers
 
 # Security
 
-Integration with Spring Security and add other filter for jwt token process.
+A Micronaut server filter reads the `Authorization: Token <jwt>` header, authenticates the user and applies the CORS and security headers.
 
-The secret key is stored in `application.properties`.
+The secret key is stored in `application.yml`.
 
 # Database
 
-It uses a ~~H2 in-memory database~~ sqlite database (for easy local test without losing test data after every restart), can be changed easily in the `application.properties` for any other database.
+It uses a ~~H2 in-memory database~~ sqlite database (for easy local test without losing test data after every restart), can be changed easily in the `application.yml` (`datasources.default`) for any other database. The Flyway migrations in `src/main/resources/db/migration` run when the service starts.
 
 # Getting started
 
-You'll need Java 11 installed.
+You'll need Java 17 installed.
 
-    ./gradlew bootRun
+    ./gradlew run
+
+or build the distribution and start it (the port is `SERVER_PORT`, 8080 by default):
+
+    ./gradlew installDist
+    build/install/realworld/bin/realworld
 
 To test that it works, open a browser tab at http://localhost:8080/tags .  
 Alternatively, you can run
@@ -57,8 +63,8 @@ Alternatively, you can run
 
 You'll need Docker installed.
 	
-    ./gradlew bootBuildImage --imageName spring-boot-realworld-example-app
-    docker run -p 8081:8080 spring-boot-realworld-example-app
+    ./gradlew installDist
+    docker run -p 8081:8080 -v "$PWD/build/install/realworld:/app" -w /tmp eclipse-temurin:17-jre /app/bin/realworld
 
 # Try it out with a RealWorld frontend
 
@@ -74,7 +80,7 @@ The repository contains a lot of test cases to cover both api test and repositor
 
 Use spotless for code format.
 
-    ./gradlew spotlessJavaApply
+    ./gradlew spotlessApply
 
 # Help
 

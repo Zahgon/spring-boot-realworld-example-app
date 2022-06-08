@@ -1,40 +1,57 @@
 package io.spring.graphql;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsData;
-import com.netflix.graphql.dgs.InputArgument;
 import graphql.execution.DataFetcherResult;
+import graphql.schema.DataFetchingEnvironment;
+import graphql.schema.idl.RuntimeWiring;
 import io.spring.api.exception.InvalidAuthenticationException;
 import io.spring.application.user.RegisterParam;
 import io.spring.application.user.UpdateUserCommand;
 import io.spring.application.user.UpdateUserParam;
 import io.spring.application.user.UserService;
+import io.spring.core.service.PasswordHasher;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
-import io.spring.graphql.DgsConstants.MUTATION;
 import io.spring.graphql.exception.GraphQLCustomizeExceptionHandler;
 import io.spring.graphql.types.CreateUserInput;
 import io.spring.graphql.types.UpdateUserInput;
 import io.spring.graphql.types.UserPayload;
 import io.spring.graphql.types.UserResult;
+import jakarta.inject.Singleton;
+import jakarta.validation.ConstraintViolationException;
 import java.util.Optional;
-import javax.validation.ConstraintViolationException;
 import lombok.AllArgsConstructor;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
-@DgsComponent
+@Singleton
 @AllArgsConstructor
-public class UserMutation {
+public class UserMutation implements GraphQLWiring {
 
   private UserRepository userRepository;
-  private PasswordEncoder encryptService;
+  private PasswordHasher passwordHasher;
   private UserService userService;
 
-  @DgsData(parentType = MUTATION.TYPE_NAME, field = MUTATION.CreateUser)
-  public DataFetcherResult<UserResult> createUser(@InputArgument("input") CreateUserInput input) {
+  @Override
+  public void wire(RuntimeWiring.Builder wiring) {
+    wiring.type(
+        "Mutation",
+        type ->
+            type.dataFetcher(
+                    "createUser",
+                    env ->
+                        createUser(
+                            GraphQLWiring.inputArgument(env, "input", CreateUserInput.class), env))
+                .dataFetcher(
+                    "login",
+                    env -> login(env.getArgument("password"), env.getArgument("email"), env))
+                .dataFetcher(
+                    "updateUser",
+                    env ->
+                        updateUser(
+                            GraphQLWiring.inputArgument(env, "changes", UpdateUserInput.class),
+                            env)));
+  }
+
+  public DataFetcherResult<UserResult> createUser(
+      CreateUserInput input, DataFetchingEnvironment dfe) {
     RegisterParam registerParam =
         new RegisterParam(input.getEmail(), input.getUsername(), input.getPassword());
     User user;
@@ -52,11 +69,10 @@ public class UserMutation {
         .build();
   }
 
-  @DgsData(parentType = MUTATION.TYPE_NAME, field = MUTATION.Login)
   public DataFetcherResult<UserPayload> login(
-      @InputArgument("password") String password, @InputArgument("email") String email) {
+      String password, String email, DataFetchingEnvironment dfe) {
     Optional<User> optional = userRepository.findByEmail(email);
-    if (optional.isPresent() && encryptService.matches(password, optional.get().getPassword())) {
+    if (optional.isPresent() && passwordHasher.matches(password, optional.get().getPassword())) {
       return DataFetcherResult.<UserPayload>newResult()
           .data(UserPayload.newBuilder().build())
           .localContext(optional.get())
@@ -66,15 +82,12 @@ public class UserMutation {
     }
   }
 
-  @DgsData(parentType = MUTATION.TYPE_NAME, field = MUTATION.UpdateUser)
   public DataFetcherResult<UserPayload> updateUser(
-      @InputArgument("changes") UpdateUserInput updateUserInput) {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication instanceof AnonymousAuthenticationToken
-        || authentication.getPrincipal() == null) {
+      UpdateUserInput updateUserInput, DataFetchingEnvironment dfe) {
+    io.spring.core.user.User currentUser = SecurityUtil.getCurrentUser(dfe).orElse(null);
+    if (currentUser == null) {
       return null;
     }
-    io.spring.core.user.User currentUser = (io.spring.core.user.User) authentication.getPrincipal();
     UpdateUserParam param =
         UpdateUserParam.builder()
             .username(updateUserInput.getUsername())

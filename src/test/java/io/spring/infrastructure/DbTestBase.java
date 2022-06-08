@@ -1,11 +1,10 @@
 package io.spring.infrastructure;
 
-import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace;
-import org.springframework.test.context.ActiveProfiles;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 
-@ActiveProfiles("test")
-@AutoConfigureTestDatabase(replace = Replace.NONE)
-@MybatisTest
+/**
+ * Repository and query tests run against a fresh in-memory database: every test method gets a new
+ * application context, so the single pooled connection (and with it the database) is recreated.
+ */
+@MicronautTest(environments = "test", startApplication = false, rebuildContext = true)
 public abstract class DbTestBase {}

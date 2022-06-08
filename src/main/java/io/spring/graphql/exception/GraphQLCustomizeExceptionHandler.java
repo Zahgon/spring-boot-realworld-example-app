@@ -1,42 +1,40 @@
 package io.spring.graphql.exception;
 
-import com.netflix.graphql.dgs.exceptions.DefaultDataFetcherExceptionHandler;
-import com.netflix.graphql.types.errors.ErrorType;
-import com.netflix.graphql.types.errors.TypedGraphQLError;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandler;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
 import graphql.execution.DataFetcherExceptionHandlerResult;
 import io.spring.api.exception.FieldErrorResource;
 import io.spring.api.exception.InvalidAuthenticationException;
+import io.spring.graphql.exception.ErrorTypeGraphQLError.Kind;
 import io.spring.graphql.types.Error;
 import io.spring.graphql.types.ErrorItem;
+import jakarta.inject.Singleton;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
-import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-@Component
+@Singleton
 public class GraphQLCustomizeExceptionHandler implements DataFetcherExceptionHandler {
-
-  private final DefaultDataFetcherExceptionHandler defaultHandler =
-      new DefaultDataFetcherExceptionHandler();
+  private static final Logger logger =
+      LoggerFactory.getLogger(GraphQLCustomizeExceptionHandler.class);
 
   @Override
   public DataFetcherExceptionHandlerResult onException(
       DataFetcherExceptionHandlerParameters handlerParameters) {
     if (handlerParameters.getException() instanceof InvalidAuthenticationException) {
       GraphQLError graphqlError =
-          TypedGraphQLError.newBuilder()
-              .errorType(ErrorType.UNAUTHENTICATED)
-              .message(handlerParameters.getException().getMessage())
-              .path(handlerParameters.getPath())
-              .build();
+          new ErrorTypeGraphQLError(
+              Kind.UNAUTHENTICATED,
+              handlerParameters.getException().getMessage(),
+              handlerParameters.getPath());
       return DataFetcherExceptionHandlerResult.newResult().error(graphqlError).build();
     } else if (handlerParameters.getException() instanceof ConstraintViolationException) {
       List<FieldErrorResource> errors = new ArrayList<>();
@@ -56,15 +54,31 @@ public class GraphQLCustomizeExceptionHandler implements DataFetcherExceptionHan
         errors.add(fieldErrorResource);
       }
       GraphQLError graphqlError =
-          TypedGraphQLError.newBadRequestBuilder()
-              .message(handlerParameters.getException().getMessage())
-              .path(handlerParameters.getPath())
-              .extensions(errorsToMap(errors))
-              .build();
+          new ErrorTypeGraphQLError(
+              Kind.BAD_REQUEST,
+              handlerParameters.getException().getMessage(),
+              handlerParameters.getPath(),
+              errorsToMap(errors));
       return DataFetcherExceptionHandlerResult.newResult().error(graphqlError).build();
     } else {
-      return defaultHandler.onException(handlerParameters);
+      return defaultError(handlerParameters);
     }
+  }
+
+  private DataFetcherExceptionHandlerResult defaultError(
+      DataFetcherExceptionHandlerParameters handlerParameters) {
+    Throwable exception = handlerParameters.getException();
+    logger.error(
+        "Exception while executing data fetcher for {}: {}",
+        handlerParameters.getPath(),
+        exception.getMessage(),
+        exception);
+    GraphQLError graphqlError =
+        new ErrorTypeGraphQLError(
+            Kind.INTERNAL,
+            exception.getClass().getName() + ": " + exception.getMessage(),
+            handlerParameters.getPath());
+    return DataFetcherExceptionHandlerResult.newResult().error(graphqlError).build();
   }
 
   public static Error getErrorsAsData(ConstraintViolationException cve) {

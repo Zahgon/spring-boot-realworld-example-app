@@ -1,49 +1,32 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
+import static io.restassured.RestAssured.given;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
-import io.spring.JacksonCustomizations;
-import io.spring.api.security.WebSecurityConfig;
+import io.micronaut.test.annotation.MockBean;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.spring.application.UserQueryService;
-import io.spring.application.user.UserService;
 import io.spring.core.user.User;
+import jakarta.inject.Inject;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(CurrentUserApi.class)
-@Import({
-  WebSecurityConfig.class,
-  JacksonCustomizations.class,
-  UserService.class,
-  ValidationAutoConfiguration.class,
-  BCryptPasswordEncoder.class
-})
+@MicronautTest(environments = "test")
 public class CurrentUserApiTest extends TestWithCurrentUser {
 
-  @Autowired private MockMvc mvc;
-
-  @MockBean private UserQueryService userQueryService;
+  @Inject private UserQueryService userQueryService;
 
   @Override
   @BeforeEach
   public void setUp() throws Exception {
     super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
   }
 
   @Test
@@ -138,7 +121,6 @@ public class CurrentUserApiTest extends TestWithCurrentUser {
         .body(param)
         .when()
         .put("/user")
-        .prettyPeek()
         .then()
         .statusCode(422)
         .body("errors.email[0]", equalTo("email already exist"));
@@ -175,5 +157,10 @@ public class CurrentUserApiTest extends TestWithCurrentUser {
         .put("/user")
         .then()
         .statusCode(401);
+  }
+
+  @MockBean(UserQueryService.class)
+  UserQueryService userQueryServiceMock() {
+    return mock(UserQueryService.class);
   }
 }

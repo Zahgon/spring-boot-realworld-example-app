@@ -1,19 +1,23 @@
 package io.spring.graphql;
 
-import com.netflix.graphql.dgs.DgsComponent;
-import com.netflix.graphql.dgs.DgsData;
+import graphql.schema.DataFetchingEnvironment;
+import graphql.schema.idl.RuntimeWiring;
 import io.spring.application.TagsQueryService;
-import io.spring.graphql.DgsConstants.QUERY;
+import jakarta.inject.Singleton;
 import java.util.List;
 import lombok.AllArgsConstructor;
 
-@DgsComponent
+@Singleton
 @AllArgsConstructor
-public class TagDatafetcher {
+public class TagDatafetcher implements GraphQLWiring {
   private TagsQueryService tagsQueryService;
 
-  @DgsData(parentType = DgsConstants.QUERY_TYPE, field = QUERY.Tags)
-  public List<String> getTags() {
+  @Override
+  public void wire(RuntimeWiring.Builder wiring) {
+    wiring.type("Query", type -> type.dataFetcher("tags", env -> getTags(env)));
+  }
+
+  public List<String> getTags(DataFetchingEnvironment dfe) {
     return tagsQueryService.allTags();
   }
 }

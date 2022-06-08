@@ -3,15 +3,15 @@ package io.spring.infrastructure.repository;
 import io.spring.core.favorite.ArticleFavorite;
 import io.spring.core.favorite.ArticleFavoriteRepository;
 import io.spring.infrastructure.mybatis.mapper.ArticleFavoriteMapper;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.Optional;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Repository;
 
-@Repository
+@Singleton
 public class MyBatisArticleFavoriteRepository implements ArticleFavoriteRepository {
   private ArticleFavoriteMapper mapper;
 
-  @Autowired
+  @Inject
   public MyBatisArticleFavoriteRepository(ArticleFavoriteMapper mapper) {
     this.mapper = mapper;
   }

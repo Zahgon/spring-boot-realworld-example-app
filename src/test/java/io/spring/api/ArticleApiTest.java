@@ -1,17 +1,18 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
+import static io.restassured.RestAssured.given;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
-import io.spring.JacksonCustomizations;
+import io.micronaut.test.annotation.MockBean;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.restassured.RestAssured;
 import io.spring.TestHelper;
-import io.spring.api.security.WebSecurityConfig;
 import io.spring.application.ArticleQueryService;
 import io.spring.application.article.ArticleCommandService;
 import io.spring.application.data.ArticleData;
@@ -19,6 +20,7 @@ import io.spring.application.data.ProfileData;
 import io.spring.core.article.Article;
 import io.spring.core.article.ArticleRepository;
 import io.spring.core.user.User;
+import jakarta.inject.Inject;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -28,28 +30,20 @@ import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest({ArticleApi.class})
-@Import({WebSecurityConfig.class, JacksonCustomizations.class})
+@MicronautTest(environments = "test")
 public class ArticleApiTest extends TestWithCurrentUser {
-  @Autowired private MockMvc mvc;
 
-  @MockBean private ArticleQueryService articleQueryService;
+  @Inject private ArticleQueryService articleQueryService;
 
-  @MockBean private ArticleRepository articleRepository;
+  @Inject private ArticleRepository articleRepository;
 
-  @MockBean ArticleCommandService articleCommandService;
+  @Inject ArticleCommandService articleCommandService;
 
   @Override
   @BeforeEach
   public void setUp() throws Exception {
     super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
   }
 
   @Test
@@ -68,7 +62,7 @@ public class ArticleApiTest extends TestWithCurrentUser {
 
     when(articleQueryService.findBySlug(eq(slug), eq(null))).thenReturn(Optional.of(articleData));
 
-    RestAssuredMockMvc.when()
+    RestAssured.when()
         .get("/articles/{slug}", slug)
         .then()
         .statusCode(200)
@@ -80,7 +74,7 @@ public class ArticleApiTest extends TestWithCurrentUser {
   @Test
   public void should_404_if_article_not_found() throws Exception {
     when(articleQueryService.findBySlug(anyString(), any())).thenReturn(Optional.empty());
-    RestAssuredMockMvc.when().get("/articles/not-exists").then().statusCode(404);
+    RestAssured.when().get("/articles/not-exists").then().statusCode(404);
   }
 
   @Test
@@ -221,5 +215,20 @@ public class ArticleApiTest extends TestWithCurrentUser {
             });
       }
     };
+  }
+
+  @MockBean(ArticleQueryService.class)
+  ArticleQueryService articleQueryServiceMock() {
+    return mock(ArticleQueryService.class);
+  }
+
+  @MockBean(ArticleRepository.class)
+  ArticleRepository articleRepositoryMock() {
+    return mock(ArticleRepository.class);
+  }
+
+  @MockBean(ArticleCommandService.class)
+  ArticleCommandService articleCommandServiceMock() {
+    return mock(ArticleCommandService.class);
   }
 }

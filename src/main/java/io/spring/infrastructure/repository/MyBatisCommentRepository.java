@@ -3,15 +3,15 @@ package io.spring.infrastructure.repository;
 import io.spring.core.comment.Comment;
 import io.spring.core.comment.CommentRepository;
 import io.spring.infrastructure.mybatis.mapper.CommentMapper;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.Optional;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
-@Component
+@Singleton
 public class MyBatisCommentRepository implements CommentRepository {
   private CommentMapper commentMapper;
 
-  @Autowired
+  @Inject
   public MyBatisCommentRepository(CommentMapper commentMapper) {
     this.commentMapper = commentMapper;
   }

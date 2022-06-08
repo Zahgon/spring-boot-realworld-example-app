@@ -1,7 +1,4 @@
 package io.spring.api.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
-
-@ResponseStatus(HttpStatus.FORBIDDEN)
+/** The current user may not modify the requested resource; answered with 403. */
 public class NoAuthorizationException extends RuntimeException {}

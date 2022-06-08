@@ -1,8 +1,23 @@
 package io.spring.api;
 
 import com.fasterxml.jackson.annotation.JsonRootName;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
 import io.spring.api.exception.NoAuthorizationException;
 import io.spring.api.exception.ResourceNotFoundException;
+import io.spring.api.security.CurrentUser;
+import io.spring.api.web.PathSegment;
+import io.spring.api.web.RequestBodyReader;
 import io.spring.application.CommentQueryService;
 import io.spring.application.data.CommentData;
 import io.spring.core.article.Article;
@@ -11,52 +26,47 @@ import io.spring.core.comment.Comment;
 import io.spring.core.comment.CommentRepository;
 import io.spring.core.service.AuthorizationService;
 import io.spring.core.user.User;
+import jakarta.validation.constraints.NotBlank;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.validation.Valid;
-import javax.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
 
-@RestController
-@RequestMapping(path = "/articles/{slug}/comments")
+@Controller("/articles/{articleSlug:[^/]+}/comments")
+@Consumes(MediaType.ALL)
+@Produces(MediaType.ALL)
 @AllArgsConstructor
 public class CommentsApi {
   private ArticleRepository articleRepository;
   private CommentRepository commentRepository;
   private CommentQueryService commentQueryService;
+  private RequestBodyReader requestBodyReader;
 
-  @PostMapping
-  public ResponseEntity<?> createComment(
-      @PathVariable("slug") String slug,
-      @AuthenticationPrincipal User user,
-      @Valid @RequestBody NewCommentParam newCommentParam) {
+  @Post
+  public HttpResponse<?> createComment(
+      HttpRequest<?> request,
+      @PathSegment("articleSlug") String slug,
+      @Nullable @CurrentUser User user,
+      @Nullable @Body byte[] body) {
+    NewCommentParam newCommentParam =
+        requestBodyReader.readValid(request, body, NewCommentParam.class);
     Article article =
         articleRepository.findBySlug(slug).orElseThrow(ResourceNotFoundException::new);
     Comment comment = new Comment(newCommentParam.getBody(), user.getId(), article.getId());
     commentRepository.save(comment);
-    return ResponseEntity.status(201)
+    return HttpResponse.status(HttpStatus.CREATED)
         .body(commentResponse(commentQueryService.findById(comment.getId(), user).get()));
   }
 
-  @GetMapping
-  public ResponseEntity getComments(
-      @PathVariable("slug") String slug, @AuthenticationPrincipal User user) {
+  @Get
+  public HttpResponse<?> getComments(
+      @PathSegment("articleSlug") String slug, @Nullable @CurrentUser User user) {
     Article article =
         articleRepository.findBySlug(slug).orElseThrow(ResourceNotFoundException::new);
     List<CommentData> comments = commentQueryService.findByArticleId(article.getId(), user);
-    return ResponseEntity.ok(
+    return HttpResponse.ok(
         new HashMap<String, Object>() {
           {
             put("comments", comments);
@@ -64,11 +74,11 @@ public class CommentsApi {
         });
   }
 
-  @RequestMapping(path = "{id}", method = RequestMethod.DELETE)
-  public ResponseEntity deleteComment(
-      @PathVariable("slug") String slug,
-      @PathVariable("id") String commentId,
-      @AuthenticationPrincipal User user) {
+  @Delete("/{id:[^/]+}")
+  public HttpResponse<?> deleteComment(
+      @PathSegment("articleSlug") String slug,
+      @PathSegment("id") String commentId,
+      @Nullable @CurrentUser User user) {
     Article article =
         articleRepository.findBySlug(slug).orElseThrow(ResourceNotFoundException::new);
     return commentRepository
@@ -79,7 +89,7 @@ public class CommentsApi {
                 throw new NoAuthorizationException();
               }
               commentRepository.remove(comment);
-              return ResponseEntity.noContent().build();
+              return HttpResponse.noContent();
             })
         .orElseThrow(ResourceNotFoundException::new);
   }

@@ -1,7 +1,4 @@
 package io.spring.api.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
-
-@ResponseStatus(value = HttpStatus.NOT_FOUND)
+/** The requested resource does not exist; answered with 404. */
 public class ResourceNotFoundException extends RuntimeException {}

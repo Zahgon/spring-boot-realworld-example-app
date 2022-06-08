@@ -1,7 +1,21 @@
 package io.spring.api;
 
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.Put;
 import io.spring.api.exception.NoAuthorizationException;
 import io.spring.api.exception.ResourceNotFoundException;
+import io.spring.api.security.CurrentUser;
+import io.spring.api.web.PathSegment;
+import io.spring.api.web.RequestBodyReader;
 import io.spring.application.ArticleQueryService;
 import io.spring.application.article.ArticleCommandService;
 import io.spring.application.article.UpdateArticleParam;
@@ -12,40 +26,35 @@ import io.spring.core.service.AuthorizationService;
 import io.spring.core.user.User;
 import java.util.HashMap;
 import java.util.Map;
-import javax.validation.Valid;
 import lombok.AllArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
-@RestController
-@RequestMapping(path = "/articles/{slug}")
+@Controller("/articles/{articleSlug:[^/]+}")
+@Consumes(MediaType.ALL)
+@Produces(MediaType.ALL)
 @AllArgsConstructor
 public class ArticleApi {
   private ArticleQueryService articleQueryService;
   private ArticleRepository articleRepository;
   private ArticleCommandService articleCommandService;
+  private RequestBodyReader requestBodyReader;
 
-  @GetMapping
-  public ResponseEntity<?> article(
-      @PathVariable("slug") String slug, @AuthenticationPrincipal User user) {
+  @Get
+  public HttpResponse<?> article(
+      @PathSegment("articleSlug") String slug, @Nullable @CurrentUser User user) {
     return articleQueryService
         .findBySlug(slug, user)
-        .map(articleData -> ResponseEntity.ok(articleResponse(articleData)))
+        .map(articleData -> HttpResponse.ok(articleResponse(articleData)))
         .orElseThrow(ResourceNotFoundException::new);
   }
 
-  @PutMapping
-  public ResponseEntity<?> updateArticle(
-      @PathVariable("slug") String slug,
-      @AuthenticationPrincipal User user,
-      @Valid @RequestBody UpdateArticleParam updateArticleParam) {
+  @Put
+  public HttpResponse<?> updateArticle(
+      HttpRequest<?> request,
+      @PathSegment("articleSlug") String slug,
+      @Nullable @CurrentUser User user,
+      @Nullable @Body byte[] body) {
+    UpdateArticleParam updateArticleParam =
+        requestBodyReader.readValid(request, body, UpdateArticleParam.class);
     return articleRepository
         .findBySlug(slug)
         .map(
@@ -55,16 +64,16 @@ public class ArticleApi {
               }
               Article updatedArticle =
                   articleCommandService.updateArticle(article, updateArticleParam);
-              return ResponseEntity.ok(
+              return HttpResponse.ok(
                   articleResponse(
                       articleQueryService.findBySlug(updatedArticle.getSlug(), user).get()));
             })
         .orElseThrow(ResourceNotFoundException::new);
   }
 
-  @DeleteMapping
-  public ResponseEntity deleteArticle(
-      @PathVariable("slug") String slug, @AuthenticationPrincipal User user) {
+  @Delete
+  public HttpResponse<?> deleteArticle(
+      @PathSegment("articleSlug") String slug, @Nullable @CurrentUser User user) {
     return articleRepository
         .findBySlug(slug)
         .map(
@@ -73,7 +82,7 @@ public class ArticleApi {
                 throw new NoAuthorizationException();
               }
               articleRepository.remove(article);
-              return ResponseEntity.noContent().build();
+              return HttpResponse.noContent();
             })
         .orElseThrow(ResourceNotFoundException::new);
   }

@@ -5,11 +5,11 @@ import io.spring.application.data.UserData;
 import io.spring.core.user.User;
 import io.spring.infrastructure.mybatis.readservice.UserReadService;
 import io.spring.infrastructure.mybatis.readservice.UserRelationshipQueryService;
+import jakarta.inject.Singleton;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
-import org.springframework.stereotype.Component;
 
-@Component
+@Singleton
 @AllArgsConstructor
 public class ProfileQueryService {
   private UserReadService userReadService;

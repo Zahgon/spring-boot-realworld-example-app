@@ -1,0 +1,10 @@
+micronaut:
+  server:
+    port: -1
+
+datasources:
+  default:
+    url: 'jdbc:sqlite::memory:'
+    maximum-pool-size: 1
+    minimum-idle: 1
+    max-lifetime: 0
